@@ -23,5 +23,8 @@ uint8_t receive_response (volatile SPI_t *SPI_addr, uint8_t number_of_bytes, uin
 uint8_t SD_init(volatile SPI_t *SPI_addr);
 uint8_t read_block (volatile SPI_t *SPI_addr, uint16_t number_of_bytes, uint8_t * array);
 
+//exp 5
+uint8_t mount_drive(uint8_t* array);
+
 
 #endif /* SD_H_ */

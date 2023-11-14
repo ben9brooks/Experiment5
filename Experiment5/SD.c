@@ -9,6 +9,7 @@
  #include "SD.h"
  #include "gpio_output.h"
 #include <util/delay.h>
+#include "sd_read.h"
 
 /*
 // #define RETURN_IF_ERROR(exp, check, return_val) \
@@ -399,4 +400,78 @@ uint8_t read_block (volatile SPI_t *SPI_addr, uint16_t number_of_bytes, uint8_t 
 
 	// step e
 	return errorStatus;
+}
+
+//global vars:
+uint32_t fat_start_setor, first_data_sector, root_dir_sector;
+
+uint8_t mount_drive(FS_values_t* fs)
+{
+	uint8_t array[512];
+	// a - read sector 0 into array
+	if(read_sector(0, 512, array) != 0)
+	{
+		return 1; //error
+	}
+	
+	// determine if 0 is MBR or BPB
+	if (array[0] != 0xEB && array[0] != 0xE9)
+	{
+		//likely the MBR, read relative sectors value at 0x01C6
+		uint32_t bpb_sector = read_value_32(0x01C6, array);
+		printf();
+		
+		//read bpb sector into array
+		if(read_sector(bpb_sector, 512, array) != 0)
+		{
+			return 2; //error
+		}
+	}
+	
+	// verify BPB
+	if(array[0] != 0xEB && array[0] != 0xE9)
+	{
+		return 3; //error, BPB not found
+	}
+	
+	// b - read values and determine FAT type
+	fs->BytesPerSec = read_value_16(11, array);
+	fs->SecPerClus = read_value_8(13, array);
+	uint16_t reservedSectorCount = read_value_16(14, array);
+	uint8_t numFATs = read_value_8(16, array);
+	uint32_t totalSectors = read_value_16(19, array);
+	if (totalSectors == 0)
+	{
+		totalSectors = read_value_32(32, array);
+	}
+	uint32_t fatSize = read_value_16(22, array);
+	if (fatSize == 0)
+	{
+		fatSize = read_value_32(36, array);
+	}
+	
+	uint32_t totalClusters = totalSectors / fs->SecPerClus;
+	if (totalClusters < 65525)
+	{
+		fs->FATtype = 16;
+	}
+	else
+	{
+		fs->FATtype = 32;
+	}
+	
+	// c - calulate starting sector numbers for FAT, 1st data sector, 1st root dir. Global vars.
+	fs->StartofFAT = reservedSectorCount;
+	if (fs->FATtype == 32)
+	{
+		fs->FirstRootDirSec = fs->StartofFAT + (numFATs * fatSize) + read_value_32(44, array);
+	}
+	else
+	{
+		fs->RootDirSecs = ((read_value_16(17,array) * 32) + (fs->BytesPerSec - 1)) / fs->BytesPerSec;
+		fs->FirstRootDirSec = fs->StartofFAT + (numFATs * fatSize);
+	}
+	fs->FirstDataSec = fs->FirstRootDirSec + fs->RootDirSecs;
+	
+	return 0; //success
 }
