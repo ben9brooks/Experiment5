@@ -19,14 +19,20 @@
 
 int main(void)
 {
+	uint8_t numEntries = 0;
+	uint32_t userDirNum = 0;
+	uint32_t userClusNum = 0;
+	uint32_t userSecNum = 0;
+	uint32_t firstSecOfClus = 0;
+	
 	/**********************************
 	*
 	* Experiment 2 Initializations
 	*
 	***********************************/
-	UART_init(UART0, BAUD_RATE);
+	//UART_init(UART0, BAUD_RATE);
 	UART_init(UART1, BAUD_RATE);
-	UART_init(UART2, BAUD_RATE);
+	//UART_init(UART2, BAUD_RATE);
 
 	/**********************************
 	*
@@ -58,6 +64,16 @@ int main(void)
 		}
 	}while(typederror != 0);
 	
+	FS_values_t* accessor_fileSystem = export_drive_values();
+	FS_values_t file_system;
+	mount_drive(&file_system);
+	
+	*accessor_fileSystem = file_system;
+	
+	uint32_t FirstRootDirSector = first_sector(0);
+	
+
+	
 	//SPI can be reinitialized at a faster freq, now that the SD has been initialized.
 	SPI_master_init(SPI0, 8000000U);
 	
@@ -66,23 +82,64 @@ int main(void)
 	// to debug SPI_transmit on MSO: Trigger Menu: Type=Edge, Source=D0, Slope=All, Level=1.51, Normal
 	while (1)
 	{
-		UART_transmit_string(UART1, "Input Block Number:\n", 21);
-		mem_block_num = long_serial_input(UART1);
-		UART_transmit_string(UART1, "Reading Block...\n", 18);
-		//set SD low/active
-		SD_CS_active(PB, (1<<4));
-		// read block with CMD17
-		typederror = read_sector(mem_block_num, 512, mem_block);
-		//send_command(SPI0, CMD17, mem_block_num);
-		//typederror = read_block(SPI0, 512, mem_block);
+		//UART_transmit_string(UART1, "Input Block Number:\n", 21);
+		//mem_block_num = long_serial_input(UART1);
+		//UART_transmit_string(UART1, "Reading Block...\n", 18);
+		//typederror = read_sector(mem_block_num, 512, mem_block);
+		
+		typederror = read_sector(FirstRootDirSector, 512, mem_block);
+		
 		if(typederror != 0)
 		{
 			display_error(UART1, typederror);
 			break;
 		}
 		//print block
-		print_memory(mem_block, 512);
 		
+		//print_memory(mem_block, 512);
+		
+		//uint8_t temp8 = read_value_8(0, mem_block);
+		//uint16_t temp16 = read_value_16(2, mem_block);
+		//uint32_t temp32 = read_value_32(2, mem_block);
+		//char str[64];
+		//sprintf(str, "test: %lX\n", temp32);
+		//UART_transmit_string(UART1, str, 64);
+		userDirNum = FirstRootDirSector;
+		while(1)
+		{
+			numEntries = print_directory(userDirNum, mem_block);
+			UART_transmit_string(UART1, "Entry Number:\n", 14);
+			userDirNum = long_serial_input(UART1);
+			
+			while(userDirNum > numEntries)
+			{
+				UART_transmit_string(UART1, "Invalid Entry Number. Provide a new one:\n", 41);
+				userDirNum = long_serial_input(UART1);
+			}
+			
+			userClusNum = read_dir_entry(FirstRootDirSector, userDirNum, mem_block);
+			char str[64];
+			sprintf(str, "test: %lX\n", userClusNum);
+			UART_transmit_string(UART1, str, 64);
+			//Directory:
+			if((userClusNum & 0x10000000) != 0)
+			{
+				userClusNum &= 0x0FFFFFFF; //mask upper 4 off
+				userDirNum = first_sector(userClusNum);
+				//memset(mem_block,0, 512);
+				//read_sector(userSecNum, 512, mem_block);
+				//print_directory(userSecNum, mem_block);
+			}
+			//File
+			else
+			{
+				
+				//print_directory(userClusNum, mem_block);
+				//read_sector(userClusNum, 512, mem_block);
+				print_file(userClusNum, mem_block);
+				
+			}	
+		}
 	}
 	
 	UART_transmit_string(UART1, stop, 5);

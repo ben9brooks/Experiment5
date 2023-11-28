@@ -9,6 +9,7 @@
 
 #include <stdint.h>
 #include "board.h"
+#include "Directory_Functions_struct.h"
 
 #define CMD0  (0x00)
 #define CMD8  (0x08)
@@ -24,7 +25,9 @@ uint8_t SD_init(volatile SPI_t *SPI_addr);
 uint8_t read_block (volatile SPI_t *SPI_addr, uint16_t number_of_bytes, uint8_t * array);
 
 //exp 5
-uint8_t mount_drive(uint8_t* array);
-
+uint8_t mount_drive(FS_values_t* fs);
+uint32_t first_sector(uint32_t cluster_num);
+uint32_t find_next_clus(uint32_t cluster_num, uint8_t array[]);
+void print_file(uint32_t first_cluster, uint8_t *buffer);
 
 #endif /* SD_H_ */

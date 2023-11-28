@@ -18,9 +18,10 @@ uint8_t read_sector( uint32_t sector_number, uint16_t sector_size, uint8_t* data
 	send_command(SPI0, CMD17, sector_number);
 	
 	// write data into array
-	if(read_block(SPI0, sector_size, data_array) != 0)
+	uint8_t error = read_block(SPI0, sector_size, data_array);
+	if(error != 0)
 	{
-		return 1; //error
+		return error; //error
 	}
 	
 	// set CS inactive (high)
@@ -48,8 +49,8 @@ uint32_t read_value_32 (uint16_t offset, uint8_t array[])
 {
 	uint32_t value = 0;
 	value |= array[offset];
-	value |= (uint16_t)array[offset+1]<<8;
-	value |= (uint16_t)array[offset+2]<<16;
-	value |= (uint16_t)array[offset+3]<<24;
+	value |= (uint32_t)array[offset+1]<<8;
+	value |= (uint32_t)array[offset+2]<<16;
+	value |= (uint32_t)array[offset+3]<<24;
 	return value;
 }

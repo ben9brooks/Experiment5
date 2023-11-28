@@ -10,6 +10,7 @@
  #include "gpio_output.h"
 #include <util/delay.h>
 #include "sd_read.h"
+#include "Directory_Functions_struct.h"
 
 /*
 // #define RETURN_IF_ERROR(exp, check, return_val) \
@@ -360,7 +361,7 @@ uint8_t read_block (volatile SPI_t *SPI_addr, uint16_t number_of_bytes, uint8_t 
 	}
 	if(data != 0)
 	{
-			return ERROR_CMD8;
+		return ERROR_CMD8;
 	}
 
 	do
@@ -403,11 +404,12 @@ uint8_t read_block (volatile SPI_t *SPI_addr, uint16_t number_of_bytes, uint8_t 
 }
 
 //global vars:
-uint32_t fat_start_setor, first_data_sector, root_dir_sector;
+uint32_t g_fat_start_sector, g_first_data_sector, g_root_dir_sectors, g_secPerClus, g_resvdSecCnt, g_bytsPerSec;
 
 uint8_t mount_drive(FS_values_t* fs)
 {
 	uint8_t array[512];
+	uint32_t mbr_relative_sectors = 0;
 	// a - read sector 0 into array
 	if(read_sector(0, 512, array) != 0)
 	{
@@ -418,16 +420,15 @@ uint8_t mount_drive(FS_values_t* fs)
 	if (array[0] != 0xEB && array[0] != 0xE9)
 	{
 		//likely the MBR, read relative sectors value at 0x01C6
-		uint32_t bpb_sector = read_value_32(0x01C6, array);
-		printf();
+		mbr_relative_sectors = read_value_32(0x01C6, array);
+		//printf();
 		
 		//read bpb sector into array
-		if(read_sector(bpb_sector, 512, array) != 0)
+		if(read_sector(mbr_relative_sectors, 512, array) != 0)
 		{
 			return 2; //error
 		}
-	}
-	
+	}	
 	// verify BPB
 	if(array[0] != 0xEB && array[0] != 0xE9)
 	{
@@ -439,7 +440,9 @@ uint8_t mount_drive(FS_values_t* fs)
 	fs->SecPerClus = read_value_8(13, array);
 	uint16_t reservedSectorCount = read_value_16(14, array);
 	uint8_t numFATs = read_value_8(16, array);
+	uint16_t rootEntCnt = read_value_16(17, array);
 	uint32_t totalSectors = read_value_16(19, array);
+	
 	if (totalSectors == 0)
 	{
 		totalSectors = read_value_32(32, array);
@@ -473,5 +476,83 @@ uint8_t mount_drive(FS_values_t* fs)
 	}
 	fs->FirstDataSec = fs->FirstRootDirSec + fs->RootDirSecs;
 	
+	//assign globals
+	g_fat_start_sector = reservedSectorCount + mbr_relative_sectors;
+	g_root_dir_sectors = ((rootEntCnt * 32) + (fs->BytesPerSec-1)) / (fs->BytesPerSec);
+	g_first_data_sector = reservedSectorCount + (numFATs * fatSize) + g_root_dir_sectors + mbr_relative_sectors;
+	g_secPerClus = fs->SecPerClus;
+	g_resvdSecCnt = reservedSectorCount;
+	g_bytsPerSec = fs->BytesPerSec;
+	
+	
 	return 0; //success
+}
+
+uint32_t first_sector(uint32_t cluster_num)
+{
+	if(cluster_num == 0)
+	{
+		return g_first_data_sector;
+	}
+	else if(cluster_num <= 2)
+	{
+		return g_first_data_sector + cluster_num;
+	}
+	return ((cluster_num-2) * g_secPerClus) + g_first_data_sector;
+}
+
+uint32_t find_next_clus(uint32_t cluster_num, uint8_t array[])
+{
+	uint32_t FATOffset = (cluster_num * 4);
+	// a
+	uint32_t ThisFATSecNum = g_resvdSecCnt + (FATOffset / g_bytsPerSec);
+	// b
+	read_sector(ThisFATSecNum, 512, array);
+	// c
+	uint32_t ThisFATEntOffset = FATOffset % g_bytsPerSec;
+	// d
+	uint32_t temp32 = read_value_32(ThisFATEntOffset, array);
+	// e
+	temp32 &= 0x0FFFFFFF;
+	// f
+	// blank
+	
+	return temp32;
+}
+
+void print_file(uint32_t first_cluster, uint8_t *buffer) {
+	uint32_t current_cluster = first_cluster;
+	uint32_t current_sector;
+	uint32_t sector_in_cluster = 0;
+
+	while (1) {
+		// Calculate first sector of the current cluster
+		current_sector = first_sector(current_cluster);
+
+		// Read and print the sector
+		read_sector(current_sector + sector_in_cluster, 512, buffer);
+		print_memory(buffer, 512); 
+
+		// Print sector and cluster information for debugging
+		//printf("Cluster: %lu, Sector: %lu\n", current_cluster, current_sector + sector_in_cluster);
+
+		// User interaction
+		UART_transmit_string(UART1, "Enter 0 to stop, 1 to continue:\n", 32);
+		uint8_t user_input = long_serial_input(UART1);
+		if (user_input == 0) {
+			return; // Exit the loop if the user chooses to exit
+		}
+
+		// Move to the next sector
+		sector_in_cluster++;
+		if (sector_in_cluster >= g_secPerClus) {
+			// Find the next cluster if all sectors in the current cluster are printed
+			current_cluster = find_next_clus(current_cluster, buffer);
+			if ((current_cluster == 0x00000007) || (current_cluster == 0x0FFFFFFF)) {
+				return; // Exit if end of the file is reached
+			}
+			sector_in_cluster = 0; // Reset the sector counter for the new cluster
+		}
+	}
+	return;
 }
