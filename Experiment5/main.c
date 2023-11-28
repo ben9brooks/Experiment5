@@ -83,8 +83,8 @@ int main(void)
 			break;
 		}
 		
-		userDirNum = FirstRootDirSector;
 		
+		userDirNum = FirstRootDirSector;
 		while(1)
 		{
 			numEntries = print_directory(userDirNum, mem_block);
@@ -104,11 +104,13 @@ int main(void)
 			{
 				userClusNum &= 0x0FFFFFFF; /* mask upper 4 off */
 				userDirNum = first_sector(userClusNum);
+				FirstRootDirSector = userDirNum;
 			}
 			/* For File */
 			else
 			{
 				print_file(userClusNum, mem_block);
+				userDirNum = FirstRootDirSector;
 			}	
 		}
 	}
