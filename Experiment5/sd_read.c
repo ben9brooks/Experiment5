@@ -9,8 +9,6 @@
 
 uint8_t read_sector( uint32_t sector_number, uint16_t sector_size, uint8_t* data_array)
 {
-	// Initialize SPI before using this function!
-	
 	// set CS active (low)
 	SD_CS_active(PB, (1<<4));
 	
@@ -32,10 +30,6 @@ uint8_t read_sector( uint32_t sector_number, uint16_t sector_size, uint8_t* data
 
 uint8_t read_value_8 (uint16_t offset, uint8_t array[])
 {
-	//array holds the sector data that this function reads
-	// a - add offset value to array ptr
-	// b - read each byte into correct location of return value. Left shifts
-	// c - print for debug
 	return array[offset];
 }
 uint16_t read_value_16 (uint16_t offset, uint8_t array[])
