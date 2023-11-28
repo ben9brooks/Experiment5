@@ -4,24 +4,21 @@
  * Created: 10/16/2023 5:03:32 PM
  *  Author: Ben
  */ 
- #include "board.h"
- #include "SPI.h"
- #include "SD.h"
- #include "gpio_output.h"
+#include "board.h"
+#include "SPI.h"
+#include "SD.h"
+#include "gpio_output.h"
 #include <util/delay.h>
 #include "sd_read.h"
 #include "Directory_Functions_struct.h"
 
-/*
-// #define RETURN_IF_ERROR(exp, check, return_val) \
-//     do {                                       \
-//         if ((exp) != (check)) {                \
-//             return (return_val);              \
-//         }                                      \
-//     } while (0)
-*/
-#define SD_CS_port (PB) //(&PINB)
+#define SD_CS_port (PB)
 #define SD_CS_pin (1<<4)
+
+/**************************************
+*		Global Variables
+***************************************/
+uint32_t g_fat_start_sector, g_first_data_sector, g_root_dir_sectors, g_secPerClus, g_resvdSecCnt, g_bytsPerSec;
 
 void SD_CS_active(volatile GPIO_port_t *port, uint8_t pin);
 void SD_CS_inactive(volatile GPIO_port_t *port, uint8_t pin);
@@ -402,9 +399,6 @@ uint8_t read_block (volatile SPI_t *SPI_addr, uint16_t number_of_bytes, uint8_t 
 	// step e
 	return errorStatus;
 }
-
-//global vars:
-uint32_t g_fat_start_sector, g_first_data_sector, g_root_dir_sectors, g_secPerClus, g_resvdSecCnt, g_bytsPerSec;
 
 uint8_t mount_drive(FS_values_t* fs)
 {

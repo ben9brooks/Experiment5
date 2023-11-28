@@ -22,35 +22,29 @@ int main(void)
 	uint8_t numEntries = 0;
 	uint32_t userDirNum = 0;
 	uint32_t userClusNum = 0;
-	uint32_t userSecNum = 0;
-	uint32_t firstSecOfClus = 0;
 	
 	/**********************************
 	*
 	* Experiment 2 Initializations
 	*
 	***********************************/
-	//UART_init(UART0, BAUD_RATE);
 	UART_init(UART1, BAUD_RATE);
-	//UART_init(UART2, BAUD_RATE);
 
 	/**********************************
 	*
 	* Experiment 3 Initializations
 	*
 	***********************************/
-	
-	// 400KHz used for the first init, which is the max hz for now.
-	SPI_master_init(SPI0, 400000U); // port 0 is used for SD card, OLED, MP3
-	uint32_t mem_block_num;
+	/* 400KHz used for the first init, which is the max hz for now. */ 
+	SPI_master_init(SPI0, 400000U); /* port 0 is used for SD card, OLED, MP3 */
 	uint8_t mem_block[512];
 	enum ErrorTypes typederror = 0;
 	
-	// debug strings
+	/* debug strings */ 
 	char start[] = "Start\n";
 	char stop[] = "Stop\n";
 	
-	// initialize SS AKA CS
+	/* initialize SS AKA CS */ 
 	GPIO_Output_Init(PB, (1<<4));
 	
 	UART_transmit_string(UART1, start, 6);
@@ -68,25 +62,19 @@ int main(void)
 	FS_values_t file_system;
 	mount_drive(&file_system);
 	
+	/* Fills the file system struct to match */ 
 	*accessor_fileSystem = file_system;
 	
 	uint32_t FirstRootDirSector = first_sector(0);
-	
 
-	
-	//SPI can be reinitialized at a faster freq, now that the SD has been initialized.
+	/* SPI can be reinitialized at a faster freq, now that the SD has been initialized. */
 	SPI_master_init(SPI0, 8000000U);
 	
 	UART_transmit_string(UART1, "SD initialized\n", 15);
 
-	// to debug SPI_transmit on MSO: Trigger Menu: Type=Edge, Source=D0, Slope=All, Level=1.51, Normal
+	/* to debug SPI_transmit on MSO: Trigger Menu: Type=Edge, Source=D0, Slope=All, Level=1.51, Normal */ 
 	while (1)
-	{
-		//UART_transmit_string(UART1, "Input Block Number:\n", 21);
-		//mem_block_num = long_serial_input(UART1);
-		//UART_transmit_string(UART1, "Reading Block...\n", 18);
-		//typederror = read_sector(mem_block_num, 512, mem_block);
-		
+	{	
 		typederror = read_sector(FirstRootDirSector, 512, mem_block);
 		
 		if(typederror != 0)
@@ -94,17 +82,9 @@ int main(void)
 			display_error(UART1, typederror);
 			break;
 		}
-		//print block
 		
-		//print_memory(mem_block, 512);
-		
-		//uint8_t temp8 = read_value_8(0, mem_block);
-		//uint16_t temp16 = read_value_16(2, mem_block);
-		//uint32_t temp32 = read_value_32(2, mem_block);
-		//char str[64];
-		//sprintf(str, "test: %lX\n", temp32);
-		//UART_transmit_string(UART1, str, 64);
 		userDirNum = FirstRootDirSector;
+		
 		while(1)
 		{
 			numEntries = print_directory(userDirNum, mem_block);
@@ -118,26 +98,17 @@ int main(void)
 			}
 			
 			userClusNum = read_dir_entry(FirstRootDirSector, userDirNum, mem_block);
-			char str[64];
-			sprintf(str, "test: %lX\n", userClusNum);
-			UART_transmit_string(UART1, str, 64);
-			//Directory:
+			
+			/* For Directory */
 			if((userClusNum & 0x10000000) != 0)
 			{
-				userClusNum &= 0x0FFFFFFF; //mask upper 4 off
+				userClusNum &= 0x0FFFFFFF; /* mask upper 4 off */
 				userDirNum = first_sector(userClusNum);
-				//memset(mem_block,0, 512);
-				//read_sector(userSecNum, 512, mem_block);
-				//print_directory(userSecNum, mem_block);
 			}
-			//File
+			/* For File */
 			else
 			{
-				
-				//print_directory(userClusNum, mem_block);
-				//read_sector(userClusNum, 512, mem_block);
 				print_file(userClusNum, mem_block);
-				
 			}	
 		}
 	}
@@ -145,4 +116,5 @@ int main(void)
 	UART_transmit_string(UART1, stop, 5);
 	UART_transmit(UART1, '\n');
 	return 0;
+	
 }
