@@ -946,7 +946,7 @@ END GROUP
  .debug_str     0x000009b2      0x243 SD.o
                                 0x63e (size before relaxing)
  .debug_str     0x00000bf5       0x34 sd_read.o
-                                0x272 (size before relaxing)
+                                0x26f (size before relaxing)
  .debug_str     0x00000c29       0x63 SPI.o
                                 0x3d6 (size before relaxing)
  .debug_str     0x00000c8c       0x21 UART.o

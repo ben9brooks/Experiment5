@@ -3566,6 +3566,12 @@ void print_file(uint32_t first_cluster, uint8_t *buffer) {
     150e:	08 95       	ret
 
 00001510 <read_sector>:
+ */ 
+
+#include "SD.h"
+
+uint8_t read_sector( uint32_t sector_number, uint16_t sector_size, uint8_t* data_array)
+{
     1510:	cf 92       	push	r12
     1512:	df 92       	push	r13
     1514:	ef 92       	push	r14
@@ -3578,30 +3584,48 @@ void print_file(uint32_t first_cluster, uint8_t *buffer) {
     1522:	7c 01       	movw	r14, r24
     1524:	ea 01       	movw	r28, r20
     1526:	89 01       	movw	r16, r18
+	// set CS active (low)
+	SD_CS_active(PB, (1<<4));
     1528:	60 e1       	ldi	r22, 0x10	; 16
     152a:	70 e0       	ldi	r23, 0x00	; 0
     152c:	83 e2       	ldi	r24, 0x23	; 35
     152e:	90 e0       	ldi	r25, 0x00	; 0
     1530:	0e 94 3d 05 	call	0xa7a	; 0xa7a <SD_CS_active>
+	
+	// send CMD 17 and sector number
+	send_command(SPI0, CMD17, sector_number);
     1534:	a7 01       	movw	r20, r14
     1536:	96 01       	movw	r18, r12
     1538:	61 e1       	ldi	r22, 0x11	; 17
     153a:	8c e4       	ldi	r24, 0x4C	; 76
     153c:	90 e0       	ldi	r25, 0x00	; 0
     153e:	0e 94 43 05 	call	0xa86	; 0xa86 <send_command>
+	
+	// write data into array
+	uint8_t error = read_block(SPI0, sector_size, data_array);
     1542:	a8 01       	movw	r20, r16
     1544:	be 01       	movw	r22, r28
     1546:	8c e4       	ldi	r24, 0x4C	; 76
     1548:	90 e0       	ldi	r25, 0x00	; 0
     154a:	0e 94 44 07 	call	0xe88	; 0xe88 <read_block>
+	if(error != 0)
     154e:	81 11       	cpse	r24, r1
     1550:	07 c0       	rjmp	.+14     	; 0x1560 <read_sector+0x50>
+	{
+		return error; //error
+	}
+	
+	// set CS inactive (high)
+	SD_CS_inactive(PB, (1<<4));
     1552:	60 e1       	ldi	r22, 0x10	; 16
     1554:	70 e0       	ldi	r23, 0x00	; 0
     1556:	83 e2       	ldi	r24, 0x23	; 35
     1558:	90 e0       	ldi	r25, 0x00	; 0
     155a:	0e 94 40 05 	call	0xa80	; 0xa80 <SD_CS_inactive>
+	
+	return 0; //success
     155e:	80 e0       	ldi	r24, 0x00	; 0
+}
     1560:	df 91       	pop	r29
     1562:	cf 91       	pop	r28
     1564:	1f 91       	pop	r17
@@ -3613,31 +3637,48 @@ void print_file(uint32_t first_cluster, uint8_t *buffer) {
     1570:	08 95       	ret
 
 00001572 <read_value_8>:
+
+uint8_t read_value_8 (uint16_t offset, uint8_t array[])
+{
+	return array[offset];
     1572:	86 0f       	add	r24, r22
     1574:	97 1f       	adc	r25, r23
+}
     1576:	fc 01       	movw	r30, r24
     1578:	80 81       	ld	r24, Z
     157a:	08 95       	ret
 
 0000157c <read_value_16>:
+uint16_t read_value_16 (uint16_t offset, uint8_t array[])
+{
+	uint16_t value = 0;
+	value |= array[offset];
     157c:	fb 01       	movw	r30, r22
     157e:	e8 0f       	add	r30, r24
     1580:	f9 1f       	adc	r31, r25
     1582:	20 81       	ld	r18, Z
+	value |= (uint16_t)array[offset+1]<<8;
     1584:	81 81       	ldd	r24, Z+1	; 0x01
     1586:	90 e0       	ldi	r25, 0x00	; 0
     1588:	98 2f       	mov	r25, r24
     158a:	88 27       	eor	r24, r24
+	return value;
+}
     158c:	82 2b       	or	r24, r18
     158e:	08 95       	ret
 
 00001590 <read_value_32>:
+uint32_t read_value_32 (uint16_t offset, uint8_t array[])
+{
     1590:	0f 93       	push	r16
     1592:	1f 93       	push	r17
+	uint32_t value = 0;
+	value |= array[offset];
     1594:	fb 01       	movw	r30, r22
     1596:	e8 0f       	add	r30, r24
     1598:	f9 1f       	adc	r31, r25
     159a:	20 81       	ld	r18, Z
+	value |= (uint32_t)array[offset+1]<<8;
     159c:	61 81       	ldd	r22, Z+1	; 0x01
     159e:	86 2f       	mov	r24, r22
     15a0:	90 e0       	ldi	r25, 0x00	; 0
@@ -3648,6 +3689,7 @@ void print_file(uint32_t first_cluster, uint8_t *buffer) {
     15aa:	98 2f       	mov	r25, r24
     15ac:	88 27       	eor	r24, r24
     15ae:	82 2b       	or	r24, r18
+	value |= (uint32_t)array[offset+2]<<16;
     15b0:	02 81       	ldd	r16, Z+2	; 0x02
     15b2:	10 e0       	ldi	r17, 0x00	; 0
     15b4:	20 e0       	ldi	r18, 0x00	; 0
@@ -3661,6 +3703,7 @@ void print_file(uint32_t first_cluster, uint8_t *buffer) {
     15c4:	51 2b       	or	r21, r17
     15c6:	62 2b       	or	r22, r18
     15c8:	73 2b       	or	r23, r19
+	value |= (uint32_t)array[offset+3]<<24;
     15ca:	83 81       	ldd	r24, Z+3	; 0x03
     15cc:	90 e0       	ldi	r25, 0x00	; 0
     15ce:	a0 e0       	ldi	r26, 0x00	; 0
@@ -3677,6 +3720,7 @@ void print_file(uint32_t first_cluster, uint8_t *buffer) {
     15e4:	3b 2b       	or	r19, r27
     15e6:	c9 01       	movw	r24, r18
     15e8:	b8 01       	movw	r22, r16
+	return value;
     15ea:	1f 91       	pop	r17
     15ec:	0f 91       	pop	r16
     15ee:	08 95       	ret

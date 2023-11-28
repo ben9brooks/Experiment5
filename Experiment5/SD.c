@@ -34,23 +34,24 @@ void SD_CS_inactive(volatile GPIO_port_t *port, uint8_t pin)
 
 uint8_t send_command (volatile SPI_t *SPI_addr, uint8_t command, uint32_t argument)
 {
-	//Maybe we make a separate function call to return an error? seems like error-checking is common and there should be a clean solution.
 	uint8_t errorStatus = 0; // No error by default
     uint8_t checksum = 0x01; // Default checksum value
     uint8_t data; // Placeholder for received SPI data
 
 	//1: check if command is 6 bits (<= 63). If not, error flag & function exits.
-	
 	if (command > 63)
 	{
 		//change this?
 		return ERROR_SPI;
 	}
+
 	//2: command OR'd with 0x40 to append start and transmission bits to the first byte to send.
 	command |= 0x40;
+
 	//3: Send first byte using SPI_transfer. If error found from transfer, exit.
 	errorStatus = SPI_transfer(SPI_addr, command, &data);
 	if (errorStatus != 0) return errorStatus;
+	
 	//4: 32-bit arg sent, MSB first. Exit if error occurs.
 	for (uint8_t i = 4; i > 0; i--) // Start from the MSB, i starts high
     {
@@ -147,8 +148,6 @@ uint8_t receive_response (volatile SPI_t *SPI_addr, uint8_t number_of_bytes, uin
 		 errorStatus = SPI_transmit(SPI_addr, 0xFF, &data);
 	 }
 
-	 
-	 
 	 /************
      *
      *  CMD0
@@ -390,7 +389,6 @@ uint8_t read_block (volatile SPI_t *SPI_addr, uint16_t number_of_bytes, uint8_t 
 	}
 
 	// step d
-
 	for(uint8_t i = 0; i < 3; i++)
 	{
 		errorStatus = SPI_transmit(SPI_addr, 0xFF, &data);
@@ -415,7 +413,6 @@ uint8_t mount_drive(FS_values_t* fs)
 	{
 		//likely the MBR, read relative sectors value at 0x01C6
 		mbr_relative_sectors = read_value_32(0x01C6, array);
-		//printf();
 		
 		//read bpb sector into array
 		if(read_sector(mbr_relative_sectors, 512, array) != 0)
@@ -477,7 +474,6 @@ uint8_t mount_drive(FS_values_t* fs)
 	g_secPerClus = fs->SecPerClus;
 	g_resvdSecCnt = reservedSectorCount;
 	g_bytsPerSec = fs->BytesPerSec;
-	
 	
 	return 0; //success
 }
